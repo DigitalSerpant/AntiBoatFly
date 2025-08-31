@@ -18,11 +18,12 @@ public final class AntiBoatFly extends JavaPlugin implements Listener {
     private static final double watermax = 0.9;
     private static final double icemax = 4;
     private static final double landmax = 0.3;
+    private double scalingFactor = 0.4; // this is what we use to change the multiplier for the downward disableing depending on the delta of the x and z.
 
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("AntiBoatFly v1.0.0 - made with \u001B[31m<3\u001B[0m from \u001B[1m\u001B[34mIEatHex\u001B[0m");
+        getLogger().info("AntiBoatFly v1.0.1 - made with \u001B[31m<3\u001B[0m from \u001B[1m\u001B[34mIEatHex\u001B[0m");
         getLogger().info("Please report any bugs or issues to: https://github.com/DigitalSerpant/AntiBoatFly");
     }
 
@@ -54,6 +55,12 @@ public final class AntiBoatFly extends JavaPlugin implements Listener {
         return Double.parseDouble(suffix);
     }
 
+    private boolean isBoatInSolidBlock(Boat boat) {
+        Location boatLoc = boat.getLocation();
+        Block block = boatLoc.getBlock();
+        return block.getType().isSolid();
+    }
+
     boolean isNoEventPos(double coordinate) {
         return String.format("%.5f", Math.abs(coordinate)).contains(".0625");
     }
@@ -81,12 +88,26 @@ public final class AntiBoatFly extends JavaPlugin implements Listener {
                 return;
             }    // great video on it here: https://www.youtube.com/watch?v=RDkWagIW6gw
 
+            if (isBoatInSolidBlock(boat)) {
+                sendback(event);
+                return;
+            }
 
             double maxspeed = getMaxSpeedForTerrain(boat); // allows us to get the max speed allowed per terrain
 
-            if (event.getTo().getY() - event.getFrom().getY() < 0 && event.getTo().distance(event.getFrom()) < icemax) {
+
+            double deltaX = event.getTo().getX() - event.getFrom().getX();
+            double deltaZ = event.getTo().getZ() - event.getFrom().getZ();
+            double horizontalDistanceSquared = deltaX * deltaX + deltaZ * deltaZ;
+            double horizontalDistance = Math.sqrt(horizontalDistanceSquared); // this is the delta combined of the x and z
+
+            double baseDownwardRequirement = 0.001; // absolute minimum.
+            double requiredDownwardMovement = baseDownwardRequirement + (horizontalDistance * scalingFactor); // the more foward they are moving the stricter we need to be.
+            double actualDownwardMovement = event.getFrom().getY() - event.getTo().getY();
+
+            if (actualDownwardMovement > requiredDownwardMovement && event.getTo().distance(event.getFrom()) < icemax) {
                 return;
-            }   // we will move on if the are going downwards and the speed going down is less than the possible speed in minecraft for a boat.
+            }
 
             if (event.getTo().distance(event.getFrom()) > maxspeed) {
                 sendback(event);
